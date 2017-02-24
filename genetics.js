@@ -1,3 +1,4 @@
+
 // Framework
 const random = (max) =>
             R.pipe(Math.random, R.multiply(max), Math.round)()
@@ -11,9 +12,10 @@ const createCreature =
                             R.map(x => random(100))
                     )
                     
-const initPopulation = (popSize, creatureSize) =>
+const initPopulation = (popSize, creatureSize, calcFitness) =>
                             initArray(popSize)
                             .map(x => createCreature(creatureSize))
+                            .map(x => Object.assign({}, {creature: x}, {fitness: calcFitness(x)}))
 
 
 // Pure functions
@@ -32,28 +34,36 @@ const mutate = (pos, newValue, creature) =>
 // input: creature
 // Worst creature
 //const fitness =  R.pipe(R.sum, R.multiply(-1), R.add(1000))
-const fitness = R.sum 
+const maxArrayFitness = R.sum 
+
+const minArrayFitness = R.pipe(R.sum, R.multiply(-1), R.add(1000)) 
+
+const distanceFromSqr = num => R.pipe(Math.sqrt, R.subtract(Math.floor(Math.sqrt(num))), R.multiply(100), R.add(1000))(num)
+
+const sqrFitness = R.reduce((acc,curr) => acc + distanceFromSqr(curr), 0) 
+
 
 const roullete = (ticket, population) => 
                {
                    let sum = 0;
                    for(let i=0; i< population.length;i++) {
-                       sum += fitness(population[i])
+                       sum += population[i].fitness
 
                        if(sum >= ticket) {
-                           return population[i]
+                           return population[i].creature
                        }
                    }
 
-                   return population[0]
+                   return population[0].creature
 
 }
 
     // input: population
-const calcMaxTicket =  R.pipe (
-                        R.map(fitness),
+const calcMaxTicket = (calcFitness, population) => R.pipe (
+                        R.map(x => x.creature),
+                        R.map(calcFitness),
                         R.sum
-                        )
+                        )(population)
 
 // Random functions
 const randomCrossoverPoint = (creatureSize) => 
@@ -71,15 +81,6 @@ const randomShouldMutate = (mutateRate) =>
 const randomRoulleteTicket = (population) =>
                                 random(calcMaxTicket(population))
 
-let parameters = {
-    mutateRate: 0.05,
-    creatureSize: 10,
-    populationSize: 500,
-    creatureMaxValue: 100
-}
-
-let pop = initPopulation(parameters.populationSize, parameters.creatureSize, parameters.creatureMaxValue)
-
 const generateRandomValues = (parameters, population, sumOfFitness) => {
                             return {
                                 mutate: randomShouldMutate(parameters.mutateRate),
@@ -96,14 +97,8 @@ const generateRandomValuesForEntirePopulation = (parameters, population, sumOfFi
                         initArray(parameters.populationSize - 1)
                         .map(x => generateRandomValues(parameters, population, sumOfFitness))
 
-console.time('generateRandoms');
-for(var i = 0;i<1;i++) {
-    generateRandomValuesForEntirePopulation(parameters, pop, calcMaxTicket(pop))
-}
-console.timeEnd('generateRandoms');
 
-
-const newCreature = (randomValues, population) => {
+const newCreature = (calcFitness, randomValues, population) => {
 
     let creatureA = roullete(randomValues.roulleteTicketA, population);
     let creatureB = roullete(randomValues.roulleteTicketB, population);
@@ -112,35 +107,61 @@ const newCreature = (randomValues, population) => {
                                          randomValues.mutatePosition, 
                                          randomValues.mutateNewValue, 
                                          offspring)
-    return mutateOffspring;
+    return {creature: mutateOffspring, fitness: calcFitness(mutateOffspring)};
 }       
-
-
 
 
 const copy = (arr) => R.concat([], arr)
 
-const getFitestCreature = (population) =>   
-                            population.reduce((acc,curr) => 
-                                fitness(curr) > fitness(acc) ? copy(curr) : acc
-                            ,[])
+// input: population
+const getFittestCreature =  R.pipe (   
+                                R.sortBy(R.prop('fitness'))
+                                ,R.last
+                             //   ,R.prop('creature')
+                            )
 
                 
 const nextGeneration = (parameters, population) => {
-                            let nextGeneration =  generateRandomValuesForEntirePopulation(parameters, population, calcMaxTicket(population))
-                                                .map(x => newCreature(x, population))
-                            return R.append(getFitestCreature(population), nextGeneration)
+                            let nextGeneration = generateRandomValuesForEntirePopulation(parameters, 
+                                                                                         population, 
+                                                                                         calcMaxTicket(parameters.calcFitness, population))
+                                                .map(randoms => newCreature(parameters.calcFitness, randoms, population))
+                            return R.append(getFittestCreature(population), nextGeneration)
 }
 
 
+
+let parameters = {
+    mutateRate: 0.05,
+    creatureSize: 10,
+    populationSize: 500,
+    creatureMaxValue: 100,
+    generationsNumber: 200,
+    calcFitness: sqrFitness
+}
+
+const geneticAlgorithm = (parameters, currentGeneration = "empty", currentPopulation = "empty") =>
+                            currentGeneration === "empty" 
+                               ? geneticAlgorithm(parameters,  
+                                                  parameters.generationsNumber, 
+                                                  initPopulation(parameters.populationSize, parameters.creatureSize, parameters.calcFitness)) 
+                               : currentGeneration === 0
+                                 ? getFittestCreature(currentPopulation)
+                                 : geneticAlgorithm(parameters, currentGeneration - 1, nextGeneration(parameters, currentPopulation))
+
+
+console.log(geneticAlgorithm(parameters));
+
+/*
+let pop = initPopulation(parameters.populationSize, parameters.creatureSize, sqrFitness)
 console.log(JSON.stringify(pop))
 console.log(JSON.stringify(parameters))
-
-
-for(var i=0;i<10;i++) {
+for(var i=0;i<100;i++) {
     pop = nextGeneration(parameters, pop);
-    let best = getFitestCreature(pop); 
-    console.log(JSON.stringify(best), " : ", fitness(best));
+    let best = getFittestCreature(pop); 
+    console.log(JSON.stringify(best.creature), " : ", best.fitness);
 }
+*/
+
 
 
