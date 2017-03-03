@@ -1,4 +1,4 @@
-
+// Add something
 // Framework
 const random = (max) =>
             R.pipe(Math.random, R.multiply(max), Math.round)()
