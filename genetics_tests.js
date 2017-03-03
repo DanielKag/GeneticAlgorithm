@@ -18,8 +18,8 @@ QUnit.test( "merge", function( assert ) {
   let creatureA = [1,2,3,4,5]
   let creatureB = [5,4,3,2,1]
   
-  assert.deepEqual(mergeCreatures(creatureA, creatureB, 1), [1,4,3,2,1]);
-  assert.deepEqual(mergeCreatures(creatureA, creatureB, 3), [1,2,3,2,1]);
+  assert.deepEqual(mergeCreatures(1, creatureA, creatureB), [1,4,3,2,1]);
+  assert.deepEqual(mergeCreatures(3, creatureA, creatureB), [1,2,3,2,1]);
 });
 
 QUnit.test( "maxArrayFitness", function( assert ) {
@@ -86,7 +86,7 @@ let parameters = {
     crossoverPoint: 3
 }
 
-  assert.deepEqual(newCreature(maxArrayFitness, parameters, pop), {creature: [2,3,4,10,9], fitness: 28})
+  assert.deepEqual(newCreature(parameters, pop), [2,3,4,10,9])
 });
 
 QUnit.test( "getFittestCreature", function( assert ) {

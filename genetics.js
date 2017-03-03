@@ -5,6 +5,12 @@ const random = (max) =>
 
 const initArray = (size) => R.range(0, size)
 
+const isDebug = false
+
+const sayX = x => isDebug ? console.log('x is ' + x): null;
+const sayY = y => isDebug ? console.log('y is ' + y): null;
+
+
 // Create random population
 const createCreature = 
                     R.pipe(
@@ -12,21 +18,24 @@ const createCreature =
                             R.map(x => random(100))
                     )
                     
-const initPopulation = (popSize, creatureSize, calcFitness) =>
-                            initArray(popSize)
-                            .map(x => createCreature(creatureSize))
-                            .map(x => Object.assign({}, {creature: x}, {fitness: calcFitness(x)}))
+const initPopulation = (parameters) =>
+                            initArray(parameters.populationSize)
+                            .map(x => createCreature(parameters.creatureSize))
+                            .map(x => Object.assign({}, {creature: x}, {fitness: parameters.calcFitness(x)}))
 
 
 // Pure functions
-const mergeCreatures = (createA, createB, mergePoint) =>
-                    R.concat( R.slice(0,          mergePoint, createA), 
+const mergeCreatures =  R.curry(
+                         (mergePoint, createA, createB) =>
+                            R.concat( R.slice(0,          mergePoint, createA), 
                               R.slice(mergePoint, Infinity,       createB))
+                        )
 
-const mutateIfShould = (shouldMutate, pos, newValue, creature) =>
+const mutateIfShould = R.curry(
+                        (shouldMutate, pos, newValue, creature) =>
                         shouldMutate 
                         ? mutate(pos, newValue, creature)
-                        : creature
+                        : creature)
 
 const mutate = (pos, newValue, creature) =>
                     Object.assign([], creature, {[pos]: newValue})
@@ -43,7 +52,7 @@ const distanceFromSqr = num => R.pipe(Math.sqrt, R.subtract(Math.floor(Math.sqrt
 const sqrFitness = R.reduce((acc,curr) => acc + distanceFromSqr(curr), 0) 
 
 
-const roullete = (ticket, population) => 
+const roullete = R.curry( (ticket, population) => 
                {
                    let sum = 0;
                    for(let i=0; i< population.length;i++) {
@@ -56,7 +65,7 @@ const roullete = (ticket, population) =>
 
                    return population[0].creature
 
-}
+})
 
     // input: population
 const calcMaxTicket = (calcFitness, population) => R.pipe (
@@ -98,7 +107,7 @@ const generateRandomValuesForEntirePopulation = (parameters, population, sumOfFi
                         .map(x => generateRandomValues(parameters, population, sumOfFitness))
 
 
-const newCreature = (calcFitness, randomValues, population) => {
+const newCreature_old = (calcFitness, randomValues, population) => {
 
     let creatureA = roullete(randomValues.roulleteTicketA, population);
     let creatureB = roullete(randomValues.roulleteTicketB, population);
@@ -108,24 +117,36 @@ const newCreature = (calcFitness, randomValues, population) => {
                                          randomValues.mutateNewValue, 
                                          offspring)
     return {creature: mutateOffspring, fitness: calcFitness(mutateOffspring)};
-}       
+}   
+
+
+const newCreature = (randomValues, population) => 
+    R.pipe(
+        roullete(randomValues.roulleteTicketB),
+        mergeCreatures(randomValues.crossoverPoint, roullete(randomValues.roulleteTicketA, population)),
+        mutateIfShould(randomValues.mutate, 
+                          randomValues.mutatePosition, 
+                          randomValues.mutateNewValue)
+    )(population)  
+
+const wrapCreatureWithFitness = (calcFitness, creature) => {
+    return {creature: creature, fitness: calcFitness(creature)}
+}
 
 
 const copy = (arr) => R.concat([], arr)
 
-// input: population
-const getFittestCreature =  R.pipe (   
-                                R.sortBy(R.prop('fitness'))
-                                ,R.last
-                             //   ,R.prop('creature')
-                            )
+const getFitness = R.prop('fitness')
 
+// input: population
+const getFittestCreature =  R.pipe (R.sortBy(getFitness),R.last)
                 
 const nextGeneration = (parameters, population) => {
                             let nextGeneration = generateRandomValuesForEntirePopulation(parameters, 
                                                                                          population, 
                                                                                          calcMaxTicket(parameters.calcFitness, population))
-                                                .map(randoms => newCreature(parameters.calcFitness, randoms, population))
+                                                .map(randoms => newCreature(randoms, population))
+                                                .map(creature => wrapCreatureWithFitness(parameters.calcFitness, creature))
                             return R.append(getFittestCreature(population), nextGeneration)
 }
 
@@ -144,13 +165,13 @@ const geneticAlgorithm = (parameters, currentGeneration = "empty", currentPopula
                             currentGeneration === "empty" 
                                ? geneticAlgorithm(parameters,  
                                                   parameters.generationsNumber, 
-                                                  initPopulation(parameters.populationSize, parameters.creatureSize, parameters.calcFitness)) 
+                                                  initPopulation(parameters)) 
                                : currentGeneration === 0
                                  ? getFittestCreature(currentPopulation)
                                  : geneticAlgorithm(parameters, currentGeneration - 1, nextGeneration(parameters, currentPopulation))
 
 
-console.log(geneticAlgorithm(parameters));
+//console.log(geneticAlgorithm(parameters));
 
 /*
 let pop = initPopulation(parameters.populationSize, parameters.creatureSize, sqrFitness)
