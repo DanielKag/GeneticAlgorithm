@@ -4,6 +4,7 @@
   "description": "Implementing a generic genetic algorithm written in functional JS",
   "main": "genetics.js",
   "dependencies": {
+    "qunit": "^0.9.1",
     "ramda": "^0.23.0"
   },
   "devDependencies": {},
